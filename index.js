@@ -41,13 +41,24 @@ app.use(express.static(frontendDir));
 // ===============================
 // 📁 UPLOAD DE IMAGENS
 // ===============================
-const uploadsDir = path.join(__dirname, '..', 'frontend', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// Usar pasta temporária do sistema (funciona em produção)
+const os = require('os');
+const uploadsDir = process.env.NODE_ENV === 'production' 
+  ? path.join(os.tmpdir(), 'farmacia-uploads')
+  : path.join(__dirname, '..', 'frontend', 'uploads');
+
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn('⚠️ Não foi possível criar pasta de uploads:', err.message);
 }
 
-// Servir arquivos estáticos
-app.use('/uploads', express.static(uploadsDir));
+// Servir arquivos estáticos (se existir)
+if (fs.existsSync(uploadsDir)) {
+  app.use('/uploads', express.static(uploadsDir));
+}
 
 // Configurar multer
 const storage = multer.diskStorage({
