@@ -1,0 +1,16 @@
+[29/12/2025, 02:14:01] [INFO] 🚀 Iniciando backup (modo: list)
+[29/12/2025, 02:14:08] [INFO] 🚀 Iniciando backup (modo: full)
+[29/12/2025, 02:14:08] [INFO] 🔄 Iniciando backup completo: backup_full_2025-12-29T05-14-08.sql
+[29/12/2025, 02:14:08] [ERROR] ❌ Erro ao criar backup: Command failed: mysqldump -h localhost -u root -pVANEJUBR042023 farmacia_db > "C:\Users\jarde\OneDrive\Desktop\Farmácia\backend\backups\backup_full_2025-12-29T05-14-08.sql"
+'mysqldump' n�o � reconhecido como um comando interno
+ou externo, um programa oper�vel ou um arquivo em lotes.
+
+[29/12/2025, 02:14:08] [ERROR] ❌ Erro na operação: Command failed: mysqldump -h localhost -u root -pVANEJUBR042023 farmacia_db > "C:\Users\jarde\OneDrive\Desktop\Farmácia\backend\backups\backup_full_2025-12-29T05-14-08.sql"
+'mysqldump' n�o � reconhecido como um comando interno
+ou externo, um programa oper�vel ou um arquivo em lotes.
+
+[29/12/2025, 02:14:45] [INFO] 🚀 Iniciando backup (modo: full)
+[29/12/2025, 02:14:45] [INFO] 🔄 Iniciando backup completo: backup_full_2025-12-29T05-14-45.sql
+[29/12/2025, 02:14:45] [INFO] ✅ Backup completo criado: 0.01 MB
+[29/12/2025, 02:14:45] [INFO] ✅ Operação concluída com sucesso
+[29/12/2025, 02:14:54] [INFO] 🚀 Iniciando backup (modo: list)
