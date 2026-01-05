@@ -2,7 +2,7 @@
 
 /**
  * 🗄️ Script de Inicialização do Banco de Dados
- * Executado automaticamente pelo Render antes de iniciar o servidor
+ * Para MySQL
  */
 
 require('dotenv').config();
@@ -10,34 +10,17 @@ const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
 
-const DB_CONFIG = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  multipleStatements: true
-};
-
 async function initDatabase() {
-  let connection;
+  const connection = await mysql.createConnection({
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'farmacia',
+    port: process.env.DB_PORT || 3306
+  });
 
   try {
-    console.log('🔧 Conectando ao banco de dados...');
-    
-    // Conectar ao MySQL (sem banco de dados específico)
-    const tempConnection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD
-    });
-
-    // Criar banco de dados se não existir
-    await tempConnection.execute(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME}`);
-    console.log('✅ Banco de dados criado ou já existe');
-    await tempConnection.end();
-
-    // Conectar ao banco de dados específico
-    connection = await mysql.createConnection(DB_CONFIG);
+    console.log('🔧 Conectando ao banco de dados MySQL...');
     console.log('✅ Conectado ao banco de dados');
 
     // Ler e executar schema
@@ -54,27 +37,25 @@ async function initDatabase() {
             await connection.execute(statement);
           } catch (error) {
             // Ignorar erros de tabelas que já existem
-            if (!error.message.includes('already exists')) {
-              console.warn('⚠️ Erro ao executar statement:', error.message);
+            if (!error.message.includes('already exists') && !error.message.includes('Duplicate')) {
+              console.warn('⚠️ Aviso:', error.message.split('\n')[0]);
             }
           }
         }
       }
-      console.log('✅ Schema do banco de dados importado');
+      console.log('✅ Schema do banco de dados sincronizado');
     } else {
-      console.warn('⚠️ Arquivo database.sql não encontrado');
+      console.warn('⚠️ Arquivo database.sql não encontrado - continuando sem inicialização');
     }
 
-    console.log('✅ Banco de dados inicializado com sucesso!');
+    console.log('✅ Banco de dados pronto!');
     process.exit(0);
 
   } catch (error) {
     console.error('❌ Erro ao inicializar banco de dados:', error.message);
     process.exit(1);
   } finally {
-    if (connection) {
-      await connection.end();
-    }
+    await connection.end();
   }
 }
 

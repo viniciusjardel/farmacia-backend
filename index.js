@@ -3,7 +3,6 @@ require('dotenv').config();
 console.log('🔥 BACKEND INICIADO 🔥');
 
 const express = require('express');
-const mysql = require('mysql2');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -35,8 +34,10 @@ app.use((req, res, next) => {
 // ===============================
 // �📁 ARQUIVOS ESTÁTICOS DO FRONTEND
 // ===============================
-const frontendDir = path.join(__dirname, '..', 'frontend');
-app.use(express.static(frontendDir));
+const frontendDir = process.env.NODE_ENV === 'production' ? null : path.join(__dirname, '..', 'frontend');
+if (frontendDir) {
+  app.use(express.static(frontendDir));
+}
 
 // ===============================
 // 📁 UPLOAD DE IMAGENS
@@ -172,21 +173,16 @@ function resetLoginAttempts(ip) {
 
 
 // ===============================
-// 🔌 MySQL
+// 🔌 MySQL Connection
 // ===============================
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-});
+const db = require('./src/config/database');
 
-db.connect(err => {
+db.query('SELECT 1', [], (err, result) => {
   if (err) {
     console.error('❌ Erro MySQL:', err);
-    return;
+  } else {
+    console.log('✅ MySQL conectado');
   }
-  console.log('✅ MySQL conectado');
 });
 
 // ===============================
@@ -222,7 +218,7 @@ function logAuditoria({
   after_data = null,
   ip
 }) {
-  db.query(
+  pgQuery(
     `INSERT INTO audit_logs
      (user_id, action, entity, entity_id, before_data, after_data, ip_address)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -280,7 +276,7 @@ app.post('/admin/verify-pin', auth, async (req, res) => {
 // ===============================
 function getAdminById(id) {
   return new Promise((resolve, reject) => {
-    db.query(
+    pgQuery(
       'SELECT id, pin_hash FROM admins WHERE id = ?',
       [id],
       (err, results) => {
@@ -295,7 +291,7 @@ function getAdminById(id) {
 // 📂 CATEGORIAS (CLIENTE + ADMIN)
 // ===============================
 app.get('/categories', (req, res) => {
-  db.query(
+  pgQuery(
     'SELECT id, name FROM categories WHERE active = 1',
     (err, results) => {
       if (err) {
@@ -317,7 +313,7 @@ app.post('/categories', auth, (req, res) => {
   }
 
   // Verificar se a categoria já existe
-  db.query(
+  pgQuery(
     'SELECT id FROM categories WHERE name = ?',
     [name.trim()],
     (err, existing) => {
@@ -330,7 +326,7 @@ app.post('/categories', auth, (req, res) => {
         return res.status(409).json({ error: 'Esta categoria já existe' });
       }
 
-      db.query(
+      pgQuery(
         'INSERT INTO categories (name, description, active) VALUES (?, ?, 1)',
         [name.trim(), description?.trim() || null],
         (err, result) => {
@@ -361,7 +357,7 @@ app.put('/categories/:id', auth, (req, res) => {
   }
 
   // Verificar se a categoria existe
-  db.query(
+  pgQuery(
     'SELECT id FROM categories WHERE id = ?',
     [id],
     (err, existing) => {
@@ -375,7 +371,7 @@ app.put('/categories/:id', auth, (req, res) => {
       }
 
       // Verificar se outro nome já existe
-      db.query(
+      pgQuery(
         'SELECT id FROM categories WHERE name = ? AND id != ?',
         [name.trim(), id],
         (err, duplicate) => {
@@ -388,7 +384,7 @@ app.put('/categories/:id', auth, (req, res) => {
             return res.status(409).json({ error: 'Já existe outra categoria com este nome' });
           }
 
-          db.query(
+          pgQuery(
             'UPDATE categories SET name = ?, description = ? WHERE id = ?',
             [name.trim(), description?.trim() || null, id],
             (err) => {
@@ -411,7 +407,7 @@ app.delete('/categories/:id', auth, (req, res) => {
   const { id } = req.params;
 
   // Verificar se a categoria existe
-  db.query(
+  pgQuery(
     'SELECT id FROM categories WHERE id = ?',
     [id],
     (err, existing) => {
@@ -425,7 +421,7 @@ app.delete('/categories/:id', auth, (req, res) => {
       }
 
       // Marcar categoria como inativa (soft delete)
-      db.query(
+      pgQuery(
         'UPDATE categories SET active = 0 WHERE id = ?',
         [id],
         (err) => {
@@ -445,7 +441,7 @@ app.delete('/categories/:id', auth, (req, res) => {
 // 🛒 PRODUTOS (CLIENTE)
 // ===============================
 app.get('/products', (req, res) => {
-  db.query(
+  pgQuery(
     `SELECT p.*, c.name AS category_name
      FROM products p
      LEFT JOIN categories c ON p.category_id = c.id`,
@@ -461,7 +457,7 @@ app.get('/products', (req, res) => {
 });
 
 app.get('/products/category/:id', (req, res) => {
-  db.query(
+  pgQuery(
     `SELECT p.*, c.name AS category_name
      FROM products p
      LEFT JOIN categories c ON p.category_id = c.id
@@ -479,7 +475,7 @@ app.get('/products/category/:id', (req, res) => {
 // ===============================
 app.get('/admin/products', auth, (req, res) => {
   console.log('📦 GET /admin/products - Buscando produtos...');
-  db.query(
+  pgQuery(
     `SELECT p.*, c.name AS category_name
      FROM products p
      LEFT JOIN categories c ON p.category_id = c.id`,
@@ -496,7 +492,7 @@ app.get('/admin/products', auth, (req, res) => {
 });
 
 app.get('/admin/products/:id', auth, (req, res) => {
-  db.query(
+  pgQuery(
     'SELECT * FROM products WHERE id = ?',
     [req.params.id],
     (err, results) => {
@@ -580,7 +576,7 @@ app.post('/admin/products', auth, async (req, res) => {
   const isActive = active !== undefined ? (active === 1 || active === '1' ? 1 : 0) : 1;
   const qty = quantity !== undefined ? parseInt(quantity) : 1;
 
-  db.query(
+  pgQuery(
     `INSERT INTO products 
      (name, description, price, category_id, image_url, active, quantity)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -633,13 +629,13 @@ app.put('/admin/products/:id', auth, async (req, res) => {
     return res.status(400).json({ message: 'Nome e preço são obrigatórios' });
   }
 
-  db.query('SELECT * FROM products WHERE id = ?', [id], (err, before) => {
+  pgQuery('SELECT * FROM products WHERE id = ?', [id], (err, before) => {
     if (err || !before.length)
       return res.status(404).json({ message: 'Produto não encontrado' });
 
     const qty = quantity !== undefined ? parseInt(quantity) : (before[0].quantity || 1);
     
-    db.query(
+    pgQuery(
       `UPDATE products SET
        name = ?, description = ?, price = ?, category_id = ?, image_url = ?, active = ?, quantity = ?
        WHERE id = ?`,
@@ -666,11 +662,11 @@ app.put('/admin/products/:id', auth, async (req, res) => {
 app.delete('/admin/products/:id', auth, async (req, res) => {
   const id = req.params.id;
 
-  db.query('SELECT * FROM products WHERE id = ?', [id], (err, before) => {
+  pgQuery('SELECT * FROM products WHERE id = ?', [id], (err, before) => {
     if (err || !before.length)
       return res.status(404).json({ message: 'Produto não encontrado' });
 
-    db.query('DELETE FROM products WHERE id = ?', [id], err => {
+    pgQuery('DELETE FROM products WHERE id = ?', [id], err => {
       if (err) return res.status(500).json(err);
 
       logAuditoria({
@@ -723,7 +719,7 @@ app.post('/admin/change-pin', auth, async (req, res) => {
     const pinNovoHash = await bcrypt.hash(pinNovo, 10);
 
     // Atualizar PIN no banco
-    db.query(
+    pgQuery(
       'UPDATE admins SET pin_hash = ? WHERE id = ?',
       [pinNovoHash, req.user.id],
       err => {
@@ -783,7 +779,7 @@ app.get('/admin/audit-logs', auth, (req, res) => {
   // Ordenar por data decrescente e limitar
   query += ' ORDER BY created_at DESC LIMIT 1000';
 
-  db.query(query, params, (err, results) => {
+  pgQuery(query, params, (err, results) => {
     if (err) return res.status(500).json(err);
     
     // Enriquecer com nome do admin
@@ -835,7 +831,7 @@ app.get('/admin/audit-logs', auth, (req, res) => {
 // 📋 AUDITORIA - LISTAR ADMINS (para filtro)
 // ===============================
 app.get('/admin/list', auth, (req, res) => {
-  db.query(
+  pgQuery(
     'SELECT id, email FROM admins ORDER BY email',
     (err, results) => {
       if (err) return res.status(500).json(err);
@@ -864,7 +860,7 @@ app.post('/login', (req, res) => {
     return res.status(400).json({ message: 'Email e senha são obrigatórios' });
   }
 
-  db.query(
+  pgQuery(
     'SELECT * FROM admins WHERE email = ?',
     [email],
     async (err, results) => {

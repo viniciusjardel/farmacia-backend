@@ -1,56 +1,42 @@
 #!/usr/bin/env node
 
 /**
- * 💾 Script de Backup Automático do Banco de Dados
- * Uso: node backup.js [full|incremental]
+ * 💾 Script de Backup - PostgreSQL/Supabase
+ * Uso: node backup.js
  * 
- * Cria backups do banco de dados MySQL
- * - Full backup: Backup completo do banco
- * - Incremental: Apenas dados modificados (simulado com timestamp)
+ * Para PostgreSQL, use pg_dump ou o painel do Supabase
+ * Este script apenas informa como fazer backup
  */
 
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 
-// ========================================
-// CONFIGURAÇÃO
-// ========================================
-const BACKUP_DIR = path.join(__dirname, 'backups');
-const BACKUP_LOG_FILE = path.join(BACKUP_DIR, 'backup.log');
-const RETENTION_DAYS = 7; // Manter backups dos últimos 7 dias
-const MAX_BACKUPS = 30; // Máximo de backups a manter
-
-// Criar diretório se não existir
-if (!fs.existsSync(BACKUP_DIR)) {
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  console.log(`📁 Diretório criado: ${BACKUP_DIR}`);
-}
-
-// ========================================
-// LOGGER
-// ========================================
 function log(message, level = 'INFO') {
   const timestamp = new Date().toLocaleString('pt-BR');
-  const logMessage = `[${timestamp}] [${level}] ${message}`;
-  console.log(logMessage);
-  
-  // Append ao arquivo de log
-  fs.appendFileSync(BACKUP_LOG_FILE, logMessage + '\n', 'utf-8');
+  console.log(`[${timestamp}] [${level}] ${message}`);
 }
 
 // ========================================
-// CRIAR BACKUP FULL (Versão Node.js Pura)
+// PARA POSTGRESQL: USE pg_dump
 // ========================================
 async function createFullBackup() {
+  log('💡 Para PostgreSQL/Supabase, use um destes métodos:', 'INFO');
+  log('   1. Dashboard Supabase: https://supabase.com/projects', 'INFO');
+  log('   2. Linha de comando: pg_dump <DATABASE_URL> > backup.sql', 'INFO');
+  log('   3. Automático com pg_dump: node backup.js schedule', 'INFO');
+  process.exit(0);
+}
+
+async function createFullBackupOld() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
   const backupFile = path.join(BACKUP_DIR, `backup_full_${timestamp}.sql`);
   
   log(`🔄 Iniciando backup completo: ${path.basename(backupFile)}`);
 
   try {
-    const connection = await mysql.createConnection({
+    const connection = await new Pool({
       host: process.env.DB_HOST,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
@@ -130,7 +116,7 @@ async function createIncrementalBackup() {
   log(`🔄 Iniciando backup incremental: ${path.basename(backupFile)}`);
 
   try {
-    const connection = await mysql.createConnection({
+    const connection = await new Pool({
       host: process.env.DB_HOST,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
@@ -213,7 +199,7 @@ async function createIncrementalBackup() {
 // REGISTRAR BACKUP NO BANCO
 // ========================================
 async function logBackupToDB(filename, size, status) {
-  const connection = await mysql.createConnection({
+  const connection = await new Pool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -295,7 +281,7 @@ async function restoreBackup(backupFile) {
   log(`🔄 Iniciando restauração: ${backupFile}`);
 
   try {
-    const connection = await mysql.createConnection({
+    const connection = await new Pool({
       host: process.env.DB_HOST,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
