@@ -30,6 +30,21 @@ function auth(req, res, next) {
 }
 
 // ===============================
+// 📋 AUDITORIA HELPER
+// ===============================
+async function logAudit(adminId, adminEmail, action, tableName, recordId, details = null) {
+  try {
+    await pool.query(
+      'INSERT INTO audit_logs (admin_id, admin_email, action, table_name, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+      [adminId, adminEmail, action, tableName, recordId, details ? JSON.stringify(details) : null]
+    );
+    console.log(`✅ [AUDIT] ${adminEmail} - ${action} (${tableName}:${recordId})`);
+  } catch (err) {
+    console.error(`❌ [AUDIT ERROR] Falha ao registrar auditoria: ${err.message}`);
+  }
+}
+
+// ===============================
 // 🔑 LOGIN
 // ===============================
 router.post('/login', async (req, res) => {
@@ -150,6 +165,16 @@ router.post('/change-pin', auth, async (req, res) => {
       [pinNovoHash, req.user.id]
     );
 
+    // Registrar auditoria
+    await logAudit(
+      req.user.id,
+      req.user.email,
+      'CHANGE_PIN',
+      'admins',
+      req.user.id,
+      null
+    );
+
     res.json({ message: 'PIN alterado com sucesso' });
   } catch (error) {
     console.error('Erro ao alterar PIN:', error);
@@ -185,8 +210,20 @@ router.post('/products', auth, async (req, res) => {
       [name, description, price, category_id, image_url, active || 1, quantity || 1]
     );
 
+    const productId = result.insertId;
+    
+    // Registrar auditoria
+    await logAudit(
+      req.user.id,
+      req.user.email,
+      'CREATE_PRODUCT',
+      'products',
+      productId,
+      { name, price, category_id }
+    );
+
     res.status(201).json({
-      id: result.insertId,
+      id: productId,
       name,
       description,
       price,
@@ -219,6 +256,16 @@ router.put('/products/:id', auth, async (req, res) => {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
+    // Registrar auditoria
+    await logAudit(
+      req.user.id,
+      req.user.email,
+      'UPDATE_PRODUCT',
+      'products',
+      id,
+      { name, price, category_id }
+    );
+
     res.json({ message: 'Produto atualizado com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar produto:', error);
@@ -238,6 +285,16 @@ router.delete('/products/:id', auth, async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
+
+    // Registrar auditoria
+    await logAudit(
+      req.user.id,
+      req.user.email,
+      'DELETE_PRODUCT',
+      'products',
+      id,
+      null
+    );
 
     res.json({ message: 'Produto deletado com sucesso' });
   } catch (error) {
