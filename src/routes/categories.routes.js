@@ -3,6 +3,31 @@ const pool = require('../config/database');
 
 const router = express.Router();
 
+// ===============================
+// 📋 AUDITORIA HELPER (Importado de admin.routes.js)
+// ===============================
+async function logAudit(userId, action, entity, entityId, beforeData = null, afterData = null) {
+  try {
+    const beforeDataStr = beforeData ? JSON.stringify(beforeData) : null;
+    const afterDataStr = afterData ? JSON.stringify(afterData) : null;
+    
+    const query = 'INSERT INTO audit_logs (user_id, action, entity, entity_id, before_data, after_data, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())';
+    
+    await pool.query(query, [
+      userId, 
+      action, 
+      entity, 
+      entityId, 
+      beforeDataStr,
+      afterDataStr
+    ]);
+    
+    console.log(`✅ [LOGAUDIT] Registro de auditoria criado: ${action} - ${entity} #${entityId}`);
+  } catch (err) {
+    console.error(`❌ [LOGAUDIT ERROR] Falha ao registrar auditoria: ${err.message}`);
+  }
+}
+
 // ✅ LISTAR TODAS AS CATEGORIAS
 router.get('/', async (req, res) => {
   try {
@@ -42,8 +67,21 @@ router.post('/', async (req, res) => {
       [name.trim(), description?.trim() || null]
     );
 
+    const categoryId = result.insertId;
+    const categoryData = { name: name.trim(), description: description?.trim() || null };
+
+    // Registrar auditoria
+    await logAudit(
+      req.user.id,
+      'CREATE_CATEGORY',
+      'categories',
+      categoryId,
+      null,
+      categoryData
+    );
+
     res.status(201).json({
-      id: result.insertId,
+      id: categoryId,
       name: name.trim(),
       description: description?.trim() || null,
       active: 1
@@ -84,9 +122,28 @@ router.put('/:id', async (req, res) => {
       return res.status(409).json({ error: 'Este nome de categoria já existe' });
     }
 
+    // Buscar dados antigos para auditoria
+    const [beforeUpdate] = await pool.query(
+      'SELECT name, description FROM categories WHERE id = ?',
+      [id]
+    );
+    const beforeData = beforeUpdate.length > 0 ? beforeUpdate[0] : null;
+
     await pool.query(
       'UPDATE categories SET name = ?, description = ? WHERE id = ?',
       [name.trim(), description?.trim() || null, id]
+    );
+
+    const afterData = { name: name.trim(), description: description?.trim() || null };
+
+    // Registrar auditoria
+    await logAudit(
+      req.user.id,
+      'UPDATE_CATEGORY',
+      'categories',
+      parseInt(id),
+      beforeData,
+      afterData
     );
 
     res.json({
@@ -116,6 +173,8 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Categoria não encontrada' });
     }
 
+    const categoryData = existing[0];
+
     // Marcar como inativo (soft delete)
     await pool.query(
       'UPDATE categories SET active = false WHERE id = ?',
@@ -126,6 +185,16 @@ router.delete('/:id', async (req, res) => {
     await pool.query(
       'UPDATE products SET category_id = NULL WHERE category_id = ?',
       [id]
+    );
+
+    // Registrar auditoria
+    await logAudit(
+      req.user.id,
+      'DELETE_CATEGORY',
+      'categories',
+      parseInt(id),
+      categoryData,
+      null
     );
 
     res.json({ message: 'Categoria excluída com sucesso' });
