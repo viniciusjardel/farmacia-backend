@@ -6,12 +6,15 @@ const router = express.Router();
 // LISTAR PRODUTOS
 router.get('/', async (req, res) => {
   try {
+    console.log('📦 Buscando produtos ativos...');
     const [products] = await pool.query(
-      'SELECT * FROM products WHERE active = true'
+      'SELECT id, name, description, price, category_id, image_url, active, quantity, created_at FROM products WHERE active = 1'
     );
+    console.log(`✅ ${products.length} produtos encontrados`);
     res.json(products);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar produtos' });
+    console.error('❌ Erro ao buscar produtos:', error);
+    res.status(500).json({ error: 'Erro ao buscar produtos', details: error.message });
   }
 });
 

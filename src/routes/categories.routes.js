@@ -6,13 +6,15 @@ const router = express.Router();
 // ✅ LISTAR TODAS AS CATEGORIAS
 router.get('/', async (req, res) => {
   try {
+    console.log('📂 Buscando categorias ativas...');
     const [categories] = await pool.query(
-      'SELECT id, name, description, active FROM categories WHERE active = true ORDER BY name'
+      'SELECT id, name, description, active FROM categories WHERE active = 1 ORDER BY name'
     );
+    console.log(`✅ ${categories.length} categorias encontradas`);
     res.json(categories);
   } catch (error) {
     console.error('❌ Erro ao listar categorias:', error);
-    res.status(500).json({ error: 'Erro ao listar categorias' });
+    res.status(500).json({ error: 'Erro ao listar categorias', details: error.message });
   }
 });
 
@@ -36,7 +38,7 @@ router.post('/', async (req, res) => {
     }
 
     const [result] = await pool.query(
-      'INSERT INTO categories (name, description, active) VALUES (?, ?, true)',
+      'INSERT INTO categories (name, description, active) VALUES (?, ?, 1)',
       [name.trim(), description?.trim() || null]
     );
 
@@ -44,7 +46,7 @@ router.post('/', async (req, res) => {
       id: result.insertId,
       name: name.trim(),
       description: description?.trim() || null,
-      active: true
+      active: 1
     });
   } catch (error) {
     console.error('❌ Erro ao criar categoria:', error);
