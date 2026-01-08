@@ -32,15 +32,32 @@ function auth(req, res, next) {
 // ===============================
 // 📋 AUDITORIA HELPER
 // ===============================
-async function logAudit(adminId, adminEmail, action, tableName, recordId, details = null) {
+async function logAudit(userId, action, entity, entityId, beforeData = null, afterData = null) {
   try {
-    await pool.query(
-      'INSERT INTO audit_logs (admin_id, admin_email, action, table_name, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-      [adminId, adminEmail, action, tableName, recordId, details ? JSON.stringify(details) : null]
-    );
-    console.log(`✅ [AUDIT] ${adminEmail} - ${action} (${tableName}:${recordId})`);
+    console.log(`\n📋 [LOGAUDIT] Registrando auditoria...`);
+    console.log(`  - userId: ${userId}`);
+    console.log(`  - action: ${action}`);
+    console.log(`  - entity: ${entity}`);
+    console.log(`  - entityId: ${entityId}`);
+    
+    const beforeDataStr = beforeData ? JSON.stringify(beforeData) : null;
+    const afterDataStr = afterData ? JSON.stringify(afterData) : null;
+    
+    const query = 'INSERT INTO audit_logs (user_id, action, entity, entity_id, before_data, after_data, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())';
+    
+    const [result] = await pool.query(query, [
+      userId, 
+      action, 
+      entity, 
+      entityId, 
+      beforeDataStr,
+      afterDataStr
+    ]);
+    
+    console.log(`✅ [LOGAUDIT] Registro criado com sucesso! ID: ${result.insertId}`);
   } catch (err) {
-    console.error(`❌ [AUDIT ERROR] Falha ao registrar auditoria: ${err.message}`);
+    console.error(`❌ [LOGAUDIT ERROR] Falha ao registrar auditoria:`);
+    console.error(`  - Erro: ${err.message}`);
   }
 }
 
@@ -168,10 +185,10 @@ router.post('/change-pin', auth, async (req, res) => {
     // Registrar auditoria
     await logAudit(
       req.user.id,
-      req.user.email,
       'CHANGE_PIN',
       'admins',
       req.user.id,
+      null,
       null
     );
 
@@ -215,10 +232,10 @@ router.post('/products', auth, async (req, res) => {
     // Registrar auditoria
     await logAudit(
       req.user.id,
-      req.user.email,
       'CREATE_PRODUCT',
       'products',
       productId,
+      null,
       { name, price, category_id }
     );
 
@@ -259,10 +276,10 @@ router.put('/products/:id', auth, async (req, res) => {
     // Registrar auditoria
     await logAudit(
       req.user.id,
-      req.user.email,
       'UPDATE_PRODUCT',
       'products',
       id,
+      { name, price, category_id },
       { name, price, category_id }
     );
 
@@ -289,10 +306,10 @@ router.delete('/products/:id', auth, async (req, res) => {
     // Registrar auditoria
     await logAudit(
       req.user.id,
-      req.user.email,
       'DELETE_PRODUCT',
       'products',
       id,
+      null,
       null
     );
 
